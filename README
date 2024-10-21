@@ -1,0 +1,5 @@
+Usage: zig-hash <root dir path>
+
+Should produce identical hashes as those printed by zig fetch.
+
+Check https://zig.news/michalsieron/buildzigzon-dependency-hashes-47kj, which describes my investigation of how zig computes package hashes.
