@@ -63,14 +63,20 @@ combineHashes() {
 packageContent() {
     # shellcheck disable=SC2002
     # shellcheck disable=SC2185
-    cat "${1}" \
-        | sed 's|//.*||' \
-        | tr -d '[:space:]' \
-        | sed -E 's/.*\.paths=\.\{([^}]*)\}.*/\1/' \
-        | sed 's/","/\n/g' \
-        | sed -E -e 's/^"//; s/",?$/\n/' \
-        | sed "s|^|$ROOT_DIR/|g" \
-        | tr '\n' '\0' \
+    {
+        if [ -d "${1}" ]; then
+            printf '%s\0' "$ROOT_DIR"
+        else
+            cat "${1}" \
+                | sed 's|//.*||' \
+                | tr -d '[:space:]' \
+                | sed -E 's/.*\.paths=\.\{([^}]*)\}.*/\1/' \
+                | sed 's/","/\n/g' \
+                | sed -E -e 's/^"//; s/",?$/\n/' \
+                | sed "s|^|$ROOT_DIR/|g" \
+                | tr '\n' '\0'
+        fi
+    } \
         | find -files0-from - -type f -or -type l 2>/dev/null \
         | LC_ALL=C sort
 }
