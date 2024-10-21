@@ -20,9 +20,11 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-# Usage: zig-hash <path to build.zig.zon>
-BUILD_ZIG_ZON="${1:-build.zig.zon}"
-ROOT_DIR="$(dirname "$BUILD_ZIG_ZON")"
+ROOT_DIR="${1}"
+if [ ! -d "${ROOT_DIR}" ] || [ ! -r "${ROOT_DIR}" ]; then
+    echo "Usage: zig-hash <root dir path>" >&2
+    exit 1
+fi
 
 # Get hash of a file, which is computed from:
 # - its normalized filepath
@@ -51,30 +53,32 @@ combineHashes() {
 }
 
 # List all files and symlinks that are part of the package:
-# 1. Remove all comments
-# 2. Remove all whitespace with `tr` to concatenate all lines
-# 3. Extract content from `.paths=.{<content>}`
-# 4. Replace all `","` with new lines
-# 5. Remove initial quote (`"`) and trailing quote (`"`) with optional comma (`,`)
-# 6. Prepend each line with $ROOT_DIR
-# 7. Replace new lines with null bytes
-# 8. Find all files and symlinks using content from earlier as starting points
-# 9. Sort by filename
+# 1. If path has build.zig.zon:
+#   1.1. Remove all comments
+#   1.2. Remove all whitespace with `tr` to concatenate all lines
+#   1.3. Extract content from `.paths=.{<content>}`
+#   1.4. Replace all `","` with new lines
+#   1.5. Remove initial quote (`"`) and trailing quote (`"`) with optional comma (`,`)
+#   1.6. Prepend each line with $ROOT_DIR
+#   1.7. Replace new lines with null bytes
+# 2. Else match any file
+# 3. Find all files and symlinks using content from earlier as starting points
+# 4. Sort by filename
 packageContent() {
     # shellcheck disable=SC2002
     # shellcheck disable=SC2185
     {
-        if [ -d "${1}" ]; then
-            printf '%s\0' "$ROOT_DIR"
-        else
-            cat "${1}" \
+        if [ -f "${1}/build.zig.zon" ]; then
+            cat "${1}/build.zig.zon" \
                 | sed 's|//.*||' \
                 | tr -d '[:space:]' \
                 | sed -E 's/.*\.paths=\.\{([^}]*)\}.*/\1/' \
                 | sed 's/","/\n/g' \
                 | sed -E -e 's/^"//; s/",?$/\n/' \
-                | sed "s|^|$ROOT_DIR/|g" \
+                | sed "s|^|${ROOT_DIR}/|g" \
                 | tr '\n' '\0'
+        else
+            printf '%s\0' "${ROOT_DIR}"
         fi
     } \
         | find -files0-from - -type f -or -type l 2>/dev/null \
@@ -84,7 +88,7 @@ packageContent() {
 # 12 stands for sha256 and 20 is hash length in hex (32 in decimal)
 printf "1220"
 
-packageContent "$BUILD_ZIG_ZON" \
+packageContent "${ROOT_DIR}" \
     | while read -r filepath; do
-    hashFile "$filepath"
+    hashFile "${filepath}"
 done | combineHashes
